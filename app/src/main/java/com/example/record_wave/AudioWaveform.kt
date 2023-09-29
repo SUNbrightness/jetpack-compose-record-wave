@@ -28,27 +28,13 @@ fun AudioWaveform(
     backgroundColor: Color,
     waveformColor: Color,
     modifier: Modifier,
-    lenPerSecond: Int = 44100,
-    showSEcond: Int = 5,
     ) {
 
 
     //找到最大值，代表了幅度最高
     val maxValue: Float = waveformPoints.maxOrNull()?.toFloat() ?: 1.0f // 默认为1，以避免除零错误
 
-    var showMaxPoint = lenPerSecond * showSEcond
-
-
-    //只显示最后5秒的音频
-    var startIndex = 0
-    var endIndex = waveformPoints.size
-
-    if(waveformPoints.size>showMaxPoint){
-        startIndex =  waveformPoints.size - showMaxPoint
-        endIndex  = waveformPoints.size
-    }
-
-
+    var showMaxPoint = waveformPoints.size
 
 
     Box(
@@ -80,13 +66,12 @@ fun AudioWaveform(
                 val path = Path()
 
 
-                for (i in 0 until endIndex-startIndex) {
+                for (i in 0 until showMaxPoint) {
 
                     val x = i * perPoint
 
-                    var pointValue =waveformPoints[startIndex+i]
 
-                    var y =  pointValue.toFloat() / maxValue * middleY
+                    var y =  waveformPoints[i].toFloat() / maxValue * middleY
 
 
                     y = y + middleY

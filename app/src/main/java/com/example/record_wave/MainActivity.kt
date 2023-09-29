@@ -7,6 +7,7 @@ import android.content.IntentFilter
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,12 +27,15 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.example.record_wave.ui.theme.Record_WaveTheme
 import com.example.record_wave.utils.AudioRecordUtil
+import com.example.record_wave.utils.FileUtil
 import com.example.record_wave.utils.RequestPermissionUtil
 import com.example.record_wave.utils.SnackbarUtil
 import kotlinx.coroutines.delay
@@ -57,6 +61,8 @@ class MainActivity : ComponentActivity() {
 
             //初始化全局 snackbar
             SnackbarUtil.init()
+
+            FileUtil.init(this)
 
             val filter = IntentFilter(Intent.ACTION_HEADSET_PLUG)
             registerReceiver(headphoneReceiver, filter)
@@ -98,19 +104,46 @@ private var isRecording = mutableStateOf(false)
 private var canSave = mutableStateOf(false)
 
 
-var amplitudes =  mutableStateListOf<Short>(0)
+var amplitudes = mutableStateListOf<Short>(0)
 
 @Composable
 fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
-
+    var recordingStartTime = remember { mutableStateOf(0L) }
+    var timeText = remember { mutableStateOf("00:00") }
 
     //开始录制就根据一定频率获取数据
     LaunchedEffect(isRecording.value) {
+
+        // 计算录制时间,
+        if (isRecording.value) {
+            // 每次开始让时间归零,
+            recordingStartTime.value = System.currentTimeMillis()
+            //清空振幅轴
+            amplitudes.clear()
+            //清空上次的缓存
+            audioRecordUtil.cleanBuffer()
+
+            canSave.value = false
+        } else {
+            canSave.value = true
+        }
+
         while (isRecording.value) {
-            val data = audioRecordUtil.getBufferedData() // 获取缓冲的录制数据
+
+            // 获取最近5秒的数据
+            val data = audioRecordUtil.getRecentData(5)
+            amplitudes.clear()
             amplitudes.addAll(data)
+
+
+            val recordingTime = System.currentTimeMillis() - recordingStartTime.value
+            val formattedTime = formatRecordingTime(recordingTime)
+            // 更新录制时间文本
+            timeText.value = formattedTime
+
             delay(500)
         }
+
     }
 
 
@@ -129,7 +162,8 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            horizontalArrangement = Arrangement.SpaceAround
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             if (isRecording.value) {
                 Button(
@@ -151,15 +185,34 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
                 }
             }
 
+            // 显示录制时间文本
+            Text(
+                text = timeText.value, // 调整间距
+            )
+
             Button(
-                modifier = Modifier.clickable(enabled = canSave.value) {},
-                onClick = { /*TODO*/ }) {
+                modifier = Modifier
+                    .background(if (canSave.value) MaterialTheme.colorScheme.primary else Color.Gray)
+                    .clickable(enabled = canSave.value) {},
+                onClick = {
+                    val savePath =
+                        "${FileUtil.bikeSavePath}/${formatRecordingTime(recordingStartTime.value)}.pcm";
+                    audioRecordUtil.saveToFile(savePath)
+                    SnackbarUtil.show("保存成功:${savePath}")
+                },
+            ) {
                 Text(text = "保存本次录制")
             }
         }
     }
 }
 
+private fun formatRecordingTime(timeMillis: Long): String {
+    val seconds = (timeMillis / 1000) % 60
+    val minutes = (timeMillis / (1000 * 60)) % 60
+    val hours = (timeMillis / (1000 * 60 * 60)) % 24
+    return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+}
 
 @Preview(showBackground = true, device = Devices.TABLET)
 @Composable
