@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import com.example.record_wave.ui.theme.Record_WaveTheme
 import com.example.record_wave.utils.AudioRecordUtil
 import com.example.record_wave.utils.FileUtil
@@ -195,8 +194,10 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
                     .background(if (canSave.value) MaterialTheme.colorScheme.primary else Color.Gray)
                     .clickable(enabled = canSave.value) {},
                 onClick = {
+                    var currentTime = recordingStartTime.value
+                    currentTime += (8 * 60 * 60 * 1000).toLong()
                     val savePath =
-                        "${FileUtil.bikeSavePath}/${formatRecordingTime(recordingStartTime.value)}.pcm";
+                        "${FileUtil.bikeSavePath}/${formatRecordingTime(currentTime)}.pcm";
                     audioRecordUtil.saveToFile(savePath)
                     SnackbarUtil.show("保存成功:${savePath}")
                 },
