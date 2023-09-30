@@ -1,2 +1,12 @@
 # 项目介绍
 
+Jetpack Compose Record Wave
+
+1. 耳机插入检测
+2. 实时录制音频，并展示一个波形图
+3. 因为我的需求原因，我设置了只有插入耳机才可以录制，并且选择性保存PCM文件
+
+
+1. Earphone insertion detection
+2. Record audio in real-time and display a waveform diagram
+3. Due to my requirements, I have set the option to record only when headphones are inserted and selectively save PCM files

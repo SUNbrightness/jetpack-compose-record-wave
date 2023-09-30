@@ -175,8 +175,9 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
                 }
             } else {
                 Button(
-                    modifier = Modifier,
-                    onClick = {
+                    modifier = Modifier
+                        .background(if (isHeadphonePlugged) MaterialTheme.colorScheme.primary else Color.Gray)
+                        .clickable(enabled = isHeadphonePlugged) {},                    onClick = {
                         isRecording.value = true
                         audioRecordUtil.startRecording()
                     }) {
