@@ -32,7 +32,7 @@ fun AudioWaveform(
 
 
     //找到最大值，代表了幅度最高
-    val maxValue: Float = waveformPoints.maxOrNull()?.toFloat() ?: 1.0f // 默认为1，以避免除零错误
+    val maxValue: Float = waveformPoints?.maxOrNull()?.toFloat() ?: 1.0f // 默认为1，以避免除零错误
 
     var showMaxPoint = waveformPoints.size
 

@@ -7,8 +7,6 @@ import android.content.IntentFilter
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -99,8 +98,7 @@ class MainActivity : ComponentActivity() {
 }
 
 var audioRecordUtil = AudioRecordUtil()
-private var isRecording = mutableStateOf(false)
-private var canSave = mutableStateOf(false)
+private var isSaving = mutableStateOf(false)
 
 
 var amplitudes = mutableStateListOf<Short>(0)
@@ -109,32 +107,44 @@ var amplitudes = mutableStateListOf<Short>(0)
 fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
     var recordingStartTime = remember { mutableStateOf(0L) }
     var timeText = remember { mutableStateOf("00:00") }
+    var audioWaveColor = remember { mutableStateOf(Color.Gray) }
 
-    //开始录制就根据一定频率获取数据
-    LaunchedEffect(isRecording.value) {
-
+    //监听耳机插入
+    LaunchedEffect(isHeadphonePlugged) {
         // 计算录制时间,
-        if (isRecording.value) {
-            // 每次开始让时间归零,
-            recordingStartTime.value = System.currentTimeMillis()
+        if (isHeadphonePlugged) {
+
             //清空振幅轴
             amplitudes.clear()
             //清空上次的缓存
             audioRecordUtil.cleanBuffer()
 
-            canSave.value = false
-        } else {
-            canSave.value = true
+            //开始监听
+            audioRecordUtil.startListen(bufferSecond = 5)
         }
-
-        while (isRecording.value) {
-
-            // 获取最近5秒的数据
-            val data = audioRecordUtil.getRecentData(5)
+        while (isHeadphonePlugged) {
+            // 获取最近的数据
+            val data = audioRecordUtil.getBuffer()
             amplitudes.clear()
             amplitudes.addAll(data)
+            delay(500)
+        }
 
+    }
 
+    LaunchedEffect(isSaving.value) {
+
+        if (isSaving.value){
+            // 每次重新录制等于现在
+            recordingStartTime.value = System.currentTimeMillis()
+            //变颜色
+            audioWaveColor.value =Color(0xFF5aa4ae)
+        }else{
+            //变颜色
+            audioWaveColor.value =Color.Gray
+        }
+
+        while (isSaving.value){
             val recordingTime = System.currentTimeMillis() - recordingStartTime.value
             val formattedTime = formatRecordingTime(recordingTime)
             // 更新录制时间文本
@@ -142,7 +152,6 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
 
             delay(500)
         }
-
     }
 
 
@@ -152,7 +161,7 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(7f),
-                backgroundColor = Color.Gray,
+                backgroundColor =audioWaveColor.value,
                 waveformColor = Color.Green,
                 waveformPoints = amplitudes,
             )
@@ -164,22 +173,31 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (isRecording.value) {
+            if (isSaving.value) {
                 Button(
                     modifier = Modifier,
                     onClick = {
-                        isRecording.value = false
-                        audioRecordUtil.stopRecording()
+                        isSaving.value = false
+                        var savePath =  audioRecordUtil.stopSaving()
+                        SnackbarUtil.show("保存成功:${savePath}")
                     }) {
                     Text(text = "结束录制")
                 }
             } else {
                 Button(
-                    modifier = Modifier
-                        .background(if (isHeadphonePlugged) MaterialTheme.colorScheme.primary else Color.Gray)
-                        .clickable(enabled = isHeadphonePlugged) {},                    onClick = {
-                        isRecording.value = true
-                        audioRecordUtil.startRecording()
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isHeadphonePlugged) MaterialTheme.colorScheme.primary else Color.Gray
+                    ),
+                    enabled = isHeadphonePlugged,
+                    onClick = {
+                        isSaving.value = true
+
+                        var currentTime = System.currentTimeMillis()
+                        currentTime += (8 * 60 * 60 * 1000).toLong()
+                        val savePath =
+                            "${FileUtil.bikeSavePath}/${formatRecordingTime(currentTime)}.pcm";
+                        //开始保存文件
+                        audioRecordUtil.startSaving(saveFile= savePath)
                     }) {
                     Text(text = "开始录制")
                 }
@@ -189,22 +207,6 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
             Text(
                 text = timeText.value, // 调整间距
             )
-
-            Button(
-                modifier = Modifier
-                    .background(if (canSave.value) MaterialTheme.colorScheme.primary else Color.Gray)
-                    .clickable(enabled = canSave.value) {},
-                onClick = {
-                    var currentTime = recordingStartTime.value
-                    currentTime += (8 * 60 * 60 * 1000).toLong()
-                    val savePath =
-                        "${FileUtil.bikeSavePath}/${formatRecordingTime(currentTime)}.pcm";
-                    audioRecordUtil.saveToFile(savePath)
-                    SnackbarUtil.show("保存成功:${savePath}")
-                },
-            ) {
-                Text(text = "保存本次录制")
-            }
         }
     }
 }

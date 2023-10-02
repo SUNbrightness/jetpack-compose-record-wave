@@ -6,10 +6,10 @@ import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
-import android.widget.Toast
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.util.LinkedList
 import kotlin.experimental.and
 
 class AudioRecordUtil {
@@ -21,82 +21,102 @@ class AudioRecordUtil {
 
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
-    private var isRecording = false
+
+    //监听中
+    private var isListening = false
+
+    //播放中
     private var isPlaying = false
+
+    //录制保存中
+    private val saveLock = Any()
+    private var saveName = ""
+    private var fileOutputStream: FileOutputStream? = null
 
     private var playbackEnabled = false
 
 
-    private val buffer = ArrayList<Short>()
+    private val buffer = LinkedList<Short>()
 
 
     // 获取最近时间的录音
-    fun getRecentData(second: Int): List<Short> {
-        //单声道 16bit一秒刚好是 sampleRate 个short
-        var dataLen = second * this.sampleRate
-
-        //不够5秒直接返回
-        val bufferSize = buffer.size
-        if (dataLen > bufferSize) {
-            return buffer.toList()
+    fun getBuffer(): List<Short> {
+        synchronized(this.buffer) {
+            return this.buffer.toList()
         }
-
-        synchronized(buffer) {
-            val toList = buffer.subList(bufferSize - dataLen, bufferSize).toList()
-            return toList
-        }
-
-
     }
 
 
     @SuppressLint("MissingPermission")
-    fun startRecording(playbackEnabled: Boolean = false, callback: ((ShortArray) -> Unit)? = null) {
-        if (isRecording) {
-            stopRecording()
-        } else {
-            this.playbackEnabled = playbackEnabled
+    fun startListen(
+        playbackEnabled: Boolean = false,
+        bufferSecond: Int = 6,
+        callback: ((ShortArray) -> Unit)? = null
+    ) {
+        if (isListening) {
+            return
+        }
 
-            audioRecord = AudioRecord(
-                audioSource,
-                sampleRate,
-                channelConfig,
-                audioFormat,
-                bufferSize
-            )
+        this.playbackEnabled = playbackEnabled
 
-            audioRecord?.startRecording()
+        audioRecord = AudioRecord(
+            audioSource,
+            sampleRate,
+            channelConfig,
+            audioFormat,
+            bufferSize
+        )
 
-            isRecording = true
+        audioRecord?.startRecording()
 
-            Thread {
-                val data = ShortArray(bufferSize)
+        isListening = true
 
-                while (isRecording) {
-                    audioRecord?.read(data, 0, bufferSize)
-                    if (playbackEnabled && isPlaying) {
-                        audioTrack?.write(data, 0, bufferSize)
-                    }
+        Thread {
+            val data = ShortArray(bufferSize)
 
-                    synchronized(buffer) {
-                        buffer.addAll(data.toList())
-                    }
-
-
-                    callback?.invoke(data)
+            while (isListening) {
+                audioRecord?.read(data, 0, bufferSize)
+                if (playbackEnabled && isPlaying) {
+                    audioTrack?.write(data, 0, bufferSize)
                 }
 
-                audioRecord?.stop()
-                audioRecord?.release()
-                audioRecord = null
+                //添加进缓存
+                this.addBuffer(data, bufferSecond = bufferSecond)
 
-                isRecording = false
-            }.start()
+                //判读是否保存成文件
+                this.fileOutputStream?.let {
+                    writeToFile(data)
+                }
+                callback?.invoke(data)
+            }
+
+            audioRecord?.stop()
+            audioRecord?.release()
+            audioRecord = null
+
+            isListening = false
+        }.start()
+
+    }
+
+
+    private fun addBuffer(bufferData: ShortArray, bufferSecond: Int = 6) {
+        //单声道 16bit一秒刚好是 sampleRate 个short
+        var dataLen = bufferSecond * this.sampleRate
+
+        synchronized(buffer) {
+            //添加进缓存
+            buffer.addAll(bufferData.toList())
+
+            //如果此时超过了指定时长的缓存则删除早期的
+            while (buffer.size > dataLen) {
+                buffer.removeFirst()
+            }
         }
     }
 
-    fun stopRecording() {
-        isRecording = false
+    fun stopListen() {
+        isListening = false
     }
 
     fun togglePlayback(playbackEnabled: Boolean = false) {
@@ -120,6 +140,7 @@ class AudioRecordUtil {
         }
     }
 
+
     private fun stopPlayback() {
         audioTrack?.apply {
             stop()
@@ -135,27 +156,47 @@ class AudioRecordUtil {
         }
     }
 
-    fun saveToFile(fileName: String) {
-        val data = buffer.toShortArray()
 
-        val file = File(fileName)
+    //将数据写入文件中
+    private fun writeToFile(bufferData: ShortArray) {
+        synchronized(this.saveLock) {
+
+
+            val byteBuffer = ByteArray(bufferData.size * 2) // 16-bit PCM 需要2个字节表示一个 short
+            for (i in bufferData.indices) {
+                val shortValue = bufferData[i]
+                byteBuffer[i * 2] = (shortValue and 0xFF).toByte() // 低位字节
+                byteBuffer[i * 2 + 1] = (shortValue.toInt() shr 8 and 0xFF).toByte() // 高位字节
+            }
+            fileOutputStream?.write(byteBuffer)
+
+        }
+    }
+
+
+    fun stopSaving(): String {
+
+        synchronized(this.saveLock) {
+            //停止录制
+            fileOutputStream?.close()
+            fileOutputStream = null
+        }
+
+        return this.saveName
+    }
+
+    fun startSaving(saveFile: String) {
+        val file = File(saveFile)
         val parentDir = file.parentFile
         if (!parentDir.exists()) {
             parentDir.mkdirs()
         }
 
-        try {
-            val fileOutputStream = FileOutputStream(file)
-            val byteBuffer = ByteArray(data.size * 2) // 16-bit PCM 需要2个字节表示一个 short
-            for (i in data.indices) {
-                val shortValue = data[i]
-                byteBuffer[i * 2] = (shortValue and 0xFF).toByte() // 低位字节
-                byteBuffer[i * 2 + 1] = (shortValue.toInt() shr 8 and 0xFF).toByte() // 高位字节
-            }
-            fileOutputStream.write(byteBuffer)
-            fileOutputStream.close()
-        } catch (e: IOException) {
-            e.printStackTrace()
+        this.saveName = saveFile
+
+        synchronized(this.saveLock) {
+            //创建输入流允许追加
+            this.fileOutputStream = FileOutputStream(saveFile, true)
         }
     }
 
