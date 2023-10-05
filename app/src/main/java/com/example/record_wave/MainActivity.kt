@@ -127,7 +127,7 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
             val data = audioRecordUtil.getBuffer()
             amplitudes.clear()
             amplitudes.addAll(data)
-            delay(500)
+            delay(100)
         }
 
     }
