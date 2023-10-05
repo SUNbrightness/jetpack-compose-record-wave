@@ -215,7 +215,7 @@ private fun formatRecordingTime(timeMillis: Long): String {
     val seconds = (timeMillis / 1000) % 60
     val minutes = (timeMillis / (1000 * 60)) % 60
     val hours = (timeMillis / (1000 * 60 * 60)) % 24
-    return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    return String.format("%02d_%02d_%02d", hours, minutes, seconds)
 }
 
 @Preview(showBackground = true, device = Devices.TABLET)
