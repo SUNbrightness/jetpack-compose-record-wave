@@ -33,7 +33,7 @@ import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.record_wave.ui.theme.Record_WaveTheme
 import com.example.record_wave.utils.AudioRecordUtil
-import com.example.record_wave.utils.FileUtil
+import com.example.record_wave.utils.PathUtil
 import com.example.record_wave.utils.RequestPermissionUtil
 import com.example.record_wave.utils.SnackbarUtil
 import kotlinx.coroutines.delay
@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
             //初始化全局 snackbar
             SnackbarUtil.init()
 
-            FileUtil.init(this)
+            PathUtil.init(this)
 
             val filter = IntentFilter(Intent.ACTION_HEADSET_PLUG)
             registerReceiver(headphoneReceiver, filter)
@@ -127,7 +127,7 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
             val data = audioRecordUtil.getBuffer()
             amplitudes.clear()
             amplitudes.addAll(data)
-            delay(100)
+            delay(500)
         }
 
     }
@@ -195,7 +195,7 @@ fun MainPage(isHeadphonePlugged: Boolean, modifier: Modifier = Modifier) {
                         var currentTime = System.currentTimeMillis()
                         currentTime += (8 * 60 * 60 * 1000).toLong()
                         val savePath =
-                            "${FileUtil.bikeSavePath}/${formatRecordingTime(currentTime)}.pcm";
+                            "${PathUtil.bikeSavePath}/${formatRecordingTime(currentTime)}.pcm";
                         //开始保存文件
                         audioRecordUtil.startSaving(saveFile= savePath)
                     }) {

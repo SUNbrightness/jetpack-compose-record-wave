@@ -4,7 +4,7 @@ import android.content.Context
 import android.widget.Toast
 import java.io.File
 
-object FileUtil {
+object PathUtil {
 
     lateinit var externalFilesDir: File;
 

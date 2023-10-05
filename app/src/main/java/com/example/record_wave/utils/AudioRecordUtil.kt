@@ -6,11 +6,12 @@ import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
+import cn.hutool.core.util.ByteUtil
+import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 import java.util.LinkedList
-import kotlin.experimental.and
+
 
 class AudioRecordUtil {
     private val audioSource = MediaRecorder.AudioSource.MIC
@@ -31,7 +32,8 @@ class AudioRecordUtil {
     //录制保存中
     private val saveLock = Any()
     private var saveName = ""
-    private var fileOutputStream: FileOutputStream? = null
+    private var fileOutputStream: BufferedOutputStream? = null
+
 
     private var playbackEnabled = false
 
@@ -160,13 +162,12 @@ class AudioRecordUtil {
     //将数据写入文件中
     private fun writeToFile(bufferData: ShortArray) {
         synchronized(this.saveLock) {
-
-
             val byteBuffer = ByteArray(bufferData.size * 2) // 16-bit PCM 需要2个字节表示一个 short
             for (i in bufferData.indices) {
                 val shortValue = bufferData[i]
-                byteBuffer[i * 2] = (shortValue and 0xFF).toByte() // 低位字节
-                byteBuffer[i * 2 + 1] = (shortValue.toInt() shr 8 and 0xFF).toByte() // 高位字节
+                val shortToBytes = ByteUtil.shortToBytes(shortValue)
+                byteBuffer[i * 2] =  shortToBytes[0]
+                byteBuffer[i * 2 + 1] = shortToBytes[1]
             }
             fileOutputStream?.write(byteBuffer)
 
@@ -196,7 +197,7 @@ class AudioRecordUtil {
 
         synchronized(this.saveLock) {
             //创建输入流允许追加
-            this.fileOutputStream = FileOutputStream(saveFile, true)
+            this.fileOutputStream = BufferedOutputStream(FileOutputStream(saveFile, true))
         }
     }
 

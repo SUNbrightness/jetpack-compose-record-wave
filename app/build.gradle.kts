@@ -69,6 +69,11 @@ dependencies {
     // Only required if you want to use utils package
     implementation("com.github.dawidraszka.compose-permission-handler:utils:1.6.0-rc")
 
+    implementation("cn.hutool:hutool-all:5.8.22")
+
+
+
+
 
 
     testImplementation("junit:junit:4.13.2")
